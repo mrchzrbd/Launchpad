@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FooterHashLink } from "@/components/layout/FooterHashLink";
 
 const footerLinks = [
   { label: "How It Works", href: "/#how-it-works" },
@@ -30,16 +31,27 @@ export function Footer() {
 
           <nav aria-label="Footer">
             <ul className="flex flex-wrap gap-x-8 gap-y-3">
-              {footerLinks.map((link) => (
-                <li key={link.href}>
-                  <Link
-                    href={link.href}
-                    className="text-sm font-body text-text-secondary hover:text-accent transition-colors duration-200"
-                  >
-                    {link.label}
-                  </Link>
-                </li>
-              ))}
+              {footerLinks.map((link) =>
+                link.href.includes("#") ? (
+                  <li key={link.href}>
+                    <FooterHashLink
+                      href={link.href}
+                      className="text-sm font-body text-text-secondary hover:text-accent transition-colors duration-200"
+                    >
+                      {link.label}
+                    </FooterHashLink>
+                  </li>
+                ) : (
+                  <li key={link.href}>
+                    <Link
+                      href={link.href}
+                      className="text-sm font-body text-text-secondary hover:text-accent transition-colors duration-200"
+                    >
+                      {link.label}
+                    </Link>
+                  </li>
+                ),
+              )}
             </ul>
           </nav>
         </div>

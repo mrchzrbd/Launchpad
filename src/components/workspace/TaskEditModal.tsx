@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Trash2, X } from "lucide-react";
+import { findColumnIdForTask } from "@/lib/kanban-mutations";
 import { useLaunchpad } from "@/lib/store";
 import type { KanbanTask } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -66,11 +67,16 @@ export function TaskEditModal({ task, columnId, onClose }: TaskEditModalProps) {
   const workspaceEpics = state.workspace?.epics ?? [];
   const epics = Array.from(new Set([...DEFAULT_EPICS, ...workspaceEpics])).sort();
 
+  const resolveColumnId = () => {
+    const columns = state.workspace?.kanbanColumns ?? [];
+    return findColumnIdForTask(columns, task.id) ?? columnId;
+  };
+
   const handleSave = () => {
     if (!title.trim()) return;
     dispatch({
       type: "EDIT_TASK",
-      columnId,
+      columnId: resolveColumnId(),
       taskId: task.id,
       updates: {
         title: title.trim(),
@@ -87,7 +93,7 @@ export function TaskEditModal({ task, columnId, onClose }: TaskEditModalProps) {
   const handleDelete = () => {
     dispatch({
       type: "DELETE_TASK",
-      columnId,
+      columnId: resolveColumnId(),
       taskId: task.id,
     });
     onClose();

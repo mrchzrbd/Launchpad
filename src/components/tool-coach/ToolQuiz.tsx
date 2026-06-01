@@ -39,6 +39,7 @@ export interface ToolQuizProps {
   subtitle?: string;
   compact?: boolean;
   onResult?: (result: ToolRecommendation) => void;
+  onClear?: () => void;
 }
 
 export function ToolQuiz({
@@ -46,6 +47,7 @@ export function ToolQuiz({
   subtitle = "Answer three quick questions — we'll point you in the right direction.",
   compact = false,
   onResult,
+  onClear,
 }: ToolQuizProps) {
   const [projectType, setProjectType] = useState<QuizProjectType | null>(null);
   const [teamSize, setTeamSize] = useState<QuizTeamSize | null>(null);
@@ -67,6 +69,7 @@ export function ToolQuiz({
     setTeamSize(null);
     setComfort(null);
     setResult(null);
+    onClear?.();
   };
 
   return (

@@ -138,10 +138,21 @@ function reducer(state: LaunchpadState, action: LaunchpadAction): LaunchpadState
     case "FINISH_ONBOARDING": {
       const finalized = finalizeGRPI(state.grpi);
       if (!finalized) return state;
+      const generated = generateWorkspace(finalized);
+      const workspace = state.workspace
+        ? {
+            ...generated,
+            kanbanColumns: state.workspace.kanbanColumns.length
+              ? state.workspace.kanbanColumns
+              : generated.kanbanColumns,
+            charter: state.workspace.charter ?? generated.charter,
+            meetings: state.workspace.meetings ?? generated.meetings,
+          }
+        : generated;
       return {
         ...state,
         grpi: finalized,
-        workspace: generateWorkspace(finalized),
+        workspace,
         isComplete: true,
         currentStep: TOTAL_STEPS - 1,
       };

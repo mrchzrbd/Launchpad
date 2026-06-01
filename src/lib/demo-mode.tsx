@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { DEMO_MODE_SESSION_KEY } from "./demo-data";
 import { useLaunchpad } from "./store";
 
-export type WorkspaceTourTab = "kanban" | "charter" | "meetings" | "roster";
+export type WorkspaceTourTab = "kanban" | "charter" | "meeting" | "roles";
 
 interface DemoModeContextValue {
   isDemoMode: boolean;
@@ -23,6 +23,7 @@ interface DemoModeContextValue {
   workspaceTourTab: WorkspaceTourTab | null;
   activateDemo: () => void;
   exitDemo: () => void;
+  clearDemoSession: () => void;
   startTour: () => void;
   endTour: () => void;
   setTourStep: (step: number) => void;
@@ -60,14 +61,19 @@ export function DemoModeProvider({ children }: { children: ReactNode }) {
     router.push("/workspace");
   }, [loadDemoState, router]);
 
-  const exitDemo = useCallback(() => {
+  const clearDemoSession = useCallback(() => {
     sessionStorage.removeItem(DEMO_MODE_SESSION_KEY);
     setIsDemoMode(false);
     setTourActive(false);
     setTourStep(0);
+    setWorkspaceTourTab(null);
+  }, []);
+
+  const exitDemo = useCallback(() => {
+    clearDemoSession();
     reset();
     router.push("/");
-  }, [reset, router]);
+  }, [clearDemoSession, reset, router]);
 
   const startTour = useCallback(() => {
     setTourStep(0);
@@ -102,6 +108,7 @@ export function DemoModeProvider({ children }: { children: ReactNode }) {
       workspaceTourTab,
       activateDemo,
       exitDemo,
+      clearDemoSession,
       startTour,
       endTour,
       setTourStep,
@@ -119,6 +126,7 @@ export function DemoModeProvider({ children }: { children: ReactNode }) {
       workspaceTourTab,
       activateDemo,
       exitDemo,
+      clearDemoSession,
       startTour,
       endTour,
       nextTourStep,

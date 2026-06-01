@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { Calendar, Clock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useLaunchpad } from "@/lib/store";
-import { DEFAULT_MEETINGS } from "@/lib/default-meetings";
 import type { TeamMeeting, TeamMeetingDay, TeamMeetingType } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -302,19 +301,7 @@ export function MeetingCadence() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (workspace && !workspace.meetings) {
-      dispatch({
-        type: "UPDATE_WORKSPACE",
-        payload: {
-          ...workspace,
-          meetings: DEFAULT_MEETINGS.map((m) => ({ ...m })),
-        },
-      });
-    }
-  }, [workspace, dispatch]);
-
-  const meetings = workspace?.meetings ?? DEFAULT_MEETINGS;
+  const meetings = workspace?.meetings ?? [];
 
   const handleSave = (m: TeamMeeting) => {
     if (editingMeeting) {
@@ -348,14 +335,37 @@ export function MeetingCadence() {
       "CALSCALE:GREGORIAN",
     ];
 
+    const dayToIndex: Record<TeamMeetingDay, number> = {
+      Sun: 0,
+      Mon: 1,
+      Tue: 2,
+      Wed: 3,
+      Thu: 4,
+      Fri: 5,
+      Sat: 6,
+    };
+
     meetings
       .filter((m) => !m.isAsync)
       .forEach((m) => {
         const byday = DAY_TO_ICS[m.day];
+        const [hours, minutes] = m.time.split(":").map(Number);
+        const start = new Date();
+        const currentDow = start.getDay();
+        const targetDow = dayToIndex[m.day];
+        let delta = targetDow - currentDow;
+        if (delta <= 0) delta += 7;
+        start.setDate(start.getDate() + delta);
+        start.setHours(hours ?? 10, minutes ?? 0, 0, 0);
+
+        const pad = (n: number) => String(n).padStart(2, "0");
+        const dtStart = `${start.getFullYear()}${pad(start.getMonth() + 1)}${pad(start.getDate())}T${pad(start.getHours())}${pad(start.getMinutes())}00`;
+
         lines.push(
           "BEGIN:VEVENT",
           `UID:${m.id}@launchpad`,
           `SUMMARY:${m.title}`,
+          `DTSTART:${dtStart}`,
           `DURATION:PT${m.duration}M`,
           m.recurring ? `RRULE:FREQ=WEEKLY;BYDAY=${byday}` : "",
           `DESCRIPTION:${m.agenda.join("\\n")}`,

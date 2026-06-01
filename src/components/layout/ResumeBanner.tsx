@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useDemoMode } from "@/lib/demo-mode";
 import { useLaunchpad } from "@/lib/store";
 
 export function ResumeBanner() {
-  const { isHydrated, hasCompletedSetup, state, reset } = useLaunchpad();
+  const { isHydrated, hasCompletedSetup, state } = useLaunchpad();
+  const { exitDemo } = useDemoMode();
 
   if (!isHydrated || !hasCompletedSetup) return null;
 
@@ -29,7 +31,7 @@ export function ResumeBanner() {
         </Link>
         <button
           type="button"
-          onClick={() => reset()}
+          onClick={() => exitDemo()}
           className="text-text-muted font-body text-sm hover:text-background transition-colors whitespace-nowrap min-h-[44px]"
         >
           Start fresh

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { Menu, X } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
+import { FreshOnboardingLink } from "@/components/onboarding/FreshOnboardingLink";
 import { Button } from "@/components/ui/Button";
 import { cn } from "@/lib/utils";
 
@@ -107,9 +108,9 @@ export function Header() {
         </nav>
 
         <div className="hidden md:block">
-          <Link href="/onboarding">
+          <FreshOnboardingLink>
             <Button size="md">Get Started</Button>
-          </Link>
+          </FreshOnboardingLink>
         </div>
 
         <button
@@ -151,11 +152,11 @@ export function Header() {
                 </Link>
               ),
             )}
-            <Link href="/onboarding" className="mt-4" onClick={() => setMobileOpen(false)}>
+            <FreshOnboardingLink className="mt-4" onClick={() => setMobileOpen(false)}>
               <Button className="w-full" size="lg">
                 Get Started
               </Button>
-            </Link>
+            </FreshOnboardingLink>
           </nav>
         </div>
       )}

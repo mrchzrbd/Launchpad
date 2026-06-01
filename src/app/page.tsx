@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { CheckCircle2 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect } from "react";
 import { TryDemoButton } from "@/components/demo/TryDemoButton";
+import { FreshOnboardingLink } from "@/components/onboarding/FreshOnboardingLink";
 import { Button } from "@/components/ui/Button";
 import { useInView } from "@/lib/hooks/useInView";
 import { cn } from "@/lib/utils";
@@ -203,14 +204,26 @@ export default function HomePage() {
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  const scrollToHashId = useCallback((hash: string) => {
+    if (!hash) return;
+    document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
+
   useEffect(() => {
     const hash = window.location.hash.replace("#", "");
     if (!hash) return;
-    const timer = setTimeout(() => {
-      document.getElementById(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 100);
+    const timer = setTimeout(() => scrollToHashId(hash), 100);
     return () => clearTimeout(timer);
-  }, []);
+  }, [scrollToHashId]);
+
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash) scrollToHashId(hash);
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, [scrollToHashId]);
 
   return (
     <>
@@ -254,11 +267,11 @@ export default function HomePage() {
 
               <motion.div variants={heroItem} className="flex flex-col gap-4 mb-10">
                 <div className="flex flex-col sm:flex-row gap-4">
-                  <Link href="/onboarding" id="hero-cta" data-demo-target="hero-cta">
+                  <FreshOnboardingLink id="hero-cta" data-demo-target="hero-cta">
                     <Button size="lg" className="w-full sm:w-auto">
                       Get Started Free
                     </Button>
-                  </Link>
+                  </FreshOnboardingLink>
                   <Button
                     variant="ghost"
                     size="lg"
@@ -387,14 +400,14 @@ export default function HomePage() {
             Stop losing Sunday nights to tool setup. Give your team a charter, a
             board, and a plan — before your next meeting starts.
           </p>
-          <Link href="/onboarding">
+          <FreshOnboardingLink>
             <Button
               size="lg"
               className="text-base px-10 h-14 bg-accent hover:bg-accent-hover shadow-button"
             >
               Get Started Free
             </Button>
-          </Link>
+          </FreshOnboardingLink>
         </ScrollReveal>
       </section>
     </>

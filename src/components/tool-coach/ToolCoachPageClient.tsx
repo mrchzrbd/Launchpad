@@ -59,6 +59,17 @@ export default function ToolCoachPageClient() {
     return (
       <div className="w-full bg-background min-w-0">
         <ToolCoachEmptyState />
+        <section
+          id="tool-quiz"
+          className="mx-auto max-w-6xl px-6 pb-20 md:pb-28 scroll-mt-24"
+        >
+          <ToolQuiz
+            title="Quick tool match"
+            subtitle="No setup required — answer three questions for a recommendation."
+            onResult={setPageQuizResult}
+            onClear={() => setPageQuizResult(null)}
+          />
+        </section>
       </div>
     );
   }
@@ -90,7 +101,10 @@ export default function ToolCoachPageClient() {
         {grpiRecommendation ? (
           <RecommendationBanner recommendation={grpiRecommendation} />
         ) : (
-          <BannerQuizFallback onResult={setBannerQuizResult} />
+          <BannerQuizFallback
+            onResult={setBannerQuizResult}
+            onClear={() => setBannerQuizResult(null)}
+          />
         )}
       </section>
 
@@ -122,7 +136,10 @@ export default function ToolCoachPageClient() {
 
       {/* Bottom quiz */}
       <section id="tool-quiz" className="mx-auto max-w-6xl px-6 pb-20 md:pb-28 scroll-mt-24">
-        <ToolQuiz onResult={setPageQuizResult} />
+        <ToolQuiz
+          onResult={setPageQuizResult}
+          onClear={() => setPageQuizResult(null)}
+        />
       </section>
     </div>
   );
@@ -130,8 +147,10 @@ export default function ToolCoachPageClient() {
 
 function BannerQuizFallback({
   onResult,
+  onClear,
 }: {
   onResult: (r: ToolRecommendation) => void;
+  onClear?: () => void;
 }) {
   const [step, setStep] = useState(0);
   const [projectType, setProjectType] = useState<QuizProjectType | null>(null);
@@ -158,8 +177,28 @@ function BannerQuizFallback({
     (step === 1 && teamSize) ||
     (step === 2 && comfort);
 
+  const handleRetake = () => {
+    setResult(null);
+    setStep(0);
+    setProjectType(null);
+    setTeamSize(null);
+    setComfort(null);
+    onClear?.();
+  };
+
   if (result) {
-    return <RecommendationBanner recommendation={result} />;
+    return (
+      <div className="space-y-3">
+        <RecommendationBanner recommendation={result} />
+        <button
+          type="button"
+          onClick={handleRetake}
+          className="font-body text-sm text-text-muted hover:text-text-primary transition-colors"
+        >
+          Retake quiz
+        </button>
+      </div>
+    );
   }
 
   const stepLabels = [

@@ -92,6 +92,7 @@ export default function OnboardingPage() {
 
       const target = e.target as HTMLElement;
       if (target.tagName === "TEXTAREA") return;
+      if (target.closest("[data-chip-input]")) return;
 
       if (stepValid) {
         e.preventDefault();

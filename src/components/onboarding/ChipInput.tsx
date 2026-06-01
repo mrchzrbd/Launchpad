@@ -42,6 +42,7 @@ export function ChipInput({
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       e.preventDefault();
+      e.stopPropagation();
       addChip();
     }
   };
@@ -52,7 +53,7 @@ export function ChipInput({
   };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-2" data-chip-input>
       <div>
         <label className="text-sm font-medium text-text-primary font-body">
           {label}

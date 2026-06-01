@@ -166,7 +166,7 @@ export interface TourStep {
   description: string;
   position: TourStepPosition;
   path: string;
-  workspaceTab?: "kanban" | "charter" | "meetings" | "roster";
+  workspaceTab?: "kanban" | "charter" | "meeting" | "roles";
 }
 
 export const DEMO_TOUR_STEPS: TourStep[] = [
