@@ -1,3 +1,5 @@
+import { buildInitialCharter } from "./charter-utils";
+import { DEFAULT_MEETINGS } from "./default-meetings";
 import { TEMPLATE_LABELS } from "./onboarding-constants";
 import type {
   GRPIData,
@@ -374,11 +376,15 @@ export function generateWorkspace(grpi: Partial<GRPIData>): WorkspaceData {
   const epics = collectEpics(kanbanColumns);
   const meetingSchedule = buildMeetingSchedule(fullGrpi);
 
+  const charter = buildInitialCharter(fullGrpi);
+
   return {
     teamCharter: buildTeamCharter(fullGrpi, generatedAt),
+    charter,
     kanbanColumns,
     meetingTemplate: buildMeetingTemplate(fullGrpi),
     meetingSchedule,
+    meetings: DEFAULT_MEETINGS.map((m) => ({ ...m })),
     raciMatrix: buildRaciMatrix(fullGrpi, epics),
     epics,
     generatedAt,

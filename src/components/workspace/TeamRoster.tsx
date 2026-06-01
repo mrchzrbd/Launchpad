@@ -1,201 +1,411 @@
 "use client";
 
-import { useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { useLaunchpad } from "@/lib/store";
+import type { TeamMember } from "@/lib/types";
 import { getInitials } from "@/lib/workspace-utils";
-import type { GRPIData, WorkspaceData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export interface TeamRosterProps {
-  grpi: GRPIData;
-  workspace: WorkspaceData;
-}
+const ROLE_SUGGESTIONS = [
+  "Team Lead",
+  "Researcher",
+  "Designer",
+  "Developer",
+  "Coordinator",
+  "Facilitator",
+  "Creative Lead",
+  "IT Support",
+];
 
-type ViewMode = "cards" | "matrix";
+const SCRUM_ROLES = ["product-owner", "scrum-master", "dev-team"] as const;
 
-export function TeamRoster({ grpi, workspace }: TeamRosterProps) {
-  const [view, setView] = useState<ViewMode>("cards");
-  const { roles, processes } = grpi;
-  const matrix = workspace.raciMatrix ?? [];
+const SCRUM_LABELS: Record<string, string> = {
+  "product-owner": "Product Owner",
+  "scrum-master": "Scrum Master",
+  "dev-team": "Dev Team",
+};
 
-  const channel = processes.communicationChannel.toLowerCase();
+const SCRUM_COLORS: Record<string, string> = {
+  "product-owner": "bg-purple-100 text-purple-800",
+  "scrum-master": "bg-blue-100 text-blue-800",
+  "dev-team": "bg-green-100 text-green-800",
+};
+
+function MemberModal({
+  member,
+  onSave,
+  onClose,
+}: {
+  member?: TeamMember;
+  onSave: (m: TeamMember) => void;
+  onClose: () => void;
+}) {
+  const isNew = !member;
+  const [name, setName] = useState(member?.name ?? "");
+  const [role, setRole] = useState(member?.role ?? "");
+  const [scrumRole, setScrumRole] = useState<TeamMember["scrumRole"]>(
+    member?.scrumRole ?? "dev-team",
+  );
+  const [responsibilities, setResponsibilities] = useState<string[]>(
+    member?.responsibilities ?? [],
+  );
+  const [newResp, setNewResp] = useState("");
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const addResp = () => {
+    if (!newResp.trim()) return;
+    setResponsibilities((prev) => [...prev, newResp.trim()]);
+    setNewResp("");
+  };
+
+  const removeResp = (i: number) =>
+    setResponsibilities((prev) => prev.filter((_, idx) => idx !== i));
+
+  const handleSave = () => {
+    if (!name.trim() || !role.trim()) return;
+    onSave({
+      id: member?.id ?? `member-${Date.now()}`,
+      name: name.trim(),
+      role: role.trim(),
+      scrumRole,
+      responsibilities: responsibilities.filter(Boolean),
+    });
+  };
+
+  const fieldClass =
+    "w-full px-3 py-2.5 bg-background border border-border rounded-lg font-body text-sm text-text-primary focus:outline-none focus:border-accent";
 
   return (
-    <div className="space-y-6">
-      {roles.length === 1 && (
-        <p
-          className="rounded-card border border-border bg-surface-alt px-4 py-3 text-sm text-text-secondary font-body"
-          role="status"
-        >
-          Add more teammates in{" "}
-          <a href="/onboarding" className="text-accent hover:underline">
-            Edit Setup
-          </a>{" "}
-          to see the full role matrix.
-        </p>
-      )}
+    <div
+      className="fixed inset-0 z-[200] flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div className="absolute inset-0 bg-text-primary/50 backdrop-blur-sm" aria-hidden="true" />
 
-      <div className="inline-flex rounded-button border border-border bg-surface-alt p-1">
-        {(
-          [
-            ["cards", "Role Cards"],
-            ["matrix", "Responsibility Matrix"],
-          ] as const
-        ).map(([mode, label]) => (
+      <div className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-surface shadow-card-hover">
+        <div className="flex items-center justify-between border-b border-border px-6 py-4">
+          <h2 className="font-display text-lg text-text-primary">
+            {isNew ? "Add Team Member" : "Edit Member"}
+          </h2>
           <button
-            key={mode}
             type="button"
-            onClick={() => setView(mode)}
-            className={cn(
-              "px-4 py-2 rounded-[8px] text-sm font-body transition-all duration-200",
-              view === mode
-                ? "bg-surface text-text-primary font-medium shadow-card"
-                : "text-text-secondary hover:text-text-primary",
-            )}
+            onClick={onClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-surface-alt"
+            aria-label="Close"
           >
-            {label}
+            <X className="w-4 h-4" />
           </button>
-        ))}
-      </div>
-
-      {view === "cards" ? (
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {roles.map((member) => (
-            <article
-              key={member.id}
-              className="rounded-card border border-border bg-surface p-6 shadow-card hover-lift transition-all duration-200"
-            >
-              <div className="flex items-start gap-4 mb-4">
-                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-text-primary text-lg font-mono font-medium text-surface">
-                  {getInitials(member.name)}
-                </span>
-                <div className="min-w-0">
-                  <h3 className="font-display text-xl text-text-primary leading-tight">
-                    {member.name}
-                  </h3>
-                  <p className="text-accent font-body font-medium text-sm mt-0.5">
-                    {member.role}
-                  </p>
-                  <span className="inline-flex mt-2 px-2 py-0.5 rounded-full bg-accent-light text-accent text-[10px] font-mono font-medium border border-accent/20">
-                    {member.scrumRole === "product-owner"
-                      ? "Product Owner"
-                      : member.scrumRole === "scrum-master"
-                        ? "Scrum Master"
-                        : "Dev Team"}
-                  </span>
-                </div>
-              </div>
-
-              <ul className="text-sm text-text-secondary font-body space-y-1.5 list-disc list-inside mb-5">
-                {member.responsibilities.map((r) => (
-                  <li key={r}>{r}</li>
-                ))}
-              </ul>
-
-              <div className="pt-4 border-t border-border">
-                <p className="text-xs font-mono uppercase tracking-wider text-text-muted mb-2">
-                  Contact
-                </p>
-                <a
-                  href="#"
-                  onClick={(e) => e.preventDefault()}
-                  className="inline-flex items-center gap-2 text-sm font-body text-accent hover:text-accent-hover transition-colors"
-                >
-                  <MessageCircle size={16} />
-                  {channel.includes("whatsapp")
-                    ? `Message on WhatsApp`
-                    : channel.includes("slack")
-                      ? `Message on Slack`
-                      : channel.includes("email")
-                        ? `Send email`
-                        : `Reach via ${processes.communicationChannel}`}
-                </a>
-              </div>
-            </article>
-          ))}
         </div>
-      ) : (
-        <div className="overflow-x-auto rounded-card border border-border bg-surface">
-          <table className="w-full text-sm font-body min-w-[600px]">
-            <thead>
-              <tr className="bg-surface-alt border-b border-border">
-                <th className="text-left px-4 py-3 font-medium text-text-primary sticky left-0 bg-surface-alt">
-                  Epic / Area
-                </th>
-                {roles.map((member) => (
-                  <th
-                    key={member.id}
-                    className="px-3 py-3 text-center font-mono text-xs text-text-secondary min-w-[72px]"
-                  >
-                    <span
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-text-primary text-surface font-medium"
-                      title={member.name}
-                    >
-                      {getInitials(member.name)}
-                    </span>
-                    <span className="block mt-1 text-[10px] truncate max-w-[72px]">
-                      {member.name.split(" ")[0]}
-                    </span>
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {matrix.map((row) => (
-                <tr key={row.epic} className="border-b border-border/60">
-                  <td className="px-4 py-3 font-medium text-text-primary sticky left-0 bg-surface">
-                    {row.epic}
-                  </td>
-                  {roles.map((member) => {
-                    const code = row.assignments[member.id] ?? "";
-                    return (
-                      <td key={member.id} className="px-3 py-3 text-center">
-                        <RaciCell code={code} />
-                      </td>
-                    );
-                  })}
-                </tr>
+
+        <div className="space-y-4 px-6 py-5 max-h-[70vh] overflow-y-auto">
+          {name && (
+            <div className="flex justify-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-text-primary font-mono text-xl font-bold text-background">
+                {getInitials(name)}
+              </div>
+            </div>
+          )}
+
+          <div>
+            <label className="mb-1.5 block font-body text-xs font-semibold uppercase tracking-wider text-text-muted">
+              Full Name *
+            </label>
+            <input
+              autoFocus
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Anna Snodgrass"
+              className={fieldClass}
+            />
+          </div>
+
+          <div>
+            <label className="mb-1.5 block font-body text-xs font-semibold uppercase tracking-wider text-text-muted">
+              Role Title *
+            </label>
+            <input
+              type="text"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+              list="role-suggestions"
+              placeholder="e.g. Team Lead"
+              className={fieldClass}
+            />
+            <datalist id="role-suggestions">
+              {ROLE_SUGGESTIONS.map((s) => (
+                <option key={s} value={s} />
               ))}
-            </tbody>
-          </table>
-          <div className="px-4 py-3 border-t border-border bg-surface-alt flex flex-wrap gap-4 text-xs text-text-muted font-mono">
-            <span>
-              <strong className="text-text-primary">R</strong> = Responsible
-            </span>
-            <span>
-              <strong className="text-text-primary">A</strong> = Accountable
-            </span>
-            <span>
-              <strong className="text-text-primary">C</strong> = Consulted
-            </span>
-            <span>
-              <strong className="text-text-primary">I</strong> = Informed
-            </span>
+            </datalist>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block font-body text-xs font-semibold uppercase tracking-wider text-text-muted">
+              Scrum Role
+            </label>
+            <div className="flex gap-2">
+              {SCRUM_ROLES.map((sr) => (
+                <button
+                  key={sr}
+                  type="button"
+                  onClick={() => setScrumRole(sr)}
+                  className={cn(
+                    "flex-1 rounded-lg px-2 py-1.5 font-body text-xs font-medium transition-all",
+                    scrumRole === sr
+                      ? SCRUM_COLORS[sr]
+                      : "bg-surface-alt text-text-secondary hover:bg-border",
+                  )}
+                >
+                  {SCRUM_LABELS[sr]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1.5 block font-body text-xs font-semibold uppercase tracking-wider text-text-muted">
+              Responsibilities
+            </label>
+            <div className="mb-2 space-y-1.5">
+              {responsibilities.map((r, i) => (
+                <div key={`${r}-${i}`} className="group flex items-center gap-2">
+                  <span className="shrink-0 text-xs text-accent">→</span>
+                  <span className="flex-1 font-body text-sm text-text-primary">{r}</span>
+                  <button
+                    type="button"
+                    onClick={() => removeResp(i)}
+                    className="text-text-muted opacity-0 transition-all hover:text-red-500 group-hover:opacity-100"
+                    aria-label="Remove responsibility"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newResp}
+                onChange={(e) => setNewResp(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addResp();
+                  }
+                }}
+                placeholder="Add responsibility..."
+                className={cn(fieldClass, "flex-1 py-2")}
+              />
+              <button
+                type="button"
+                onClick={addResp}
+                className="rounded-lg bg-surface-alt px-3 py-2 transition-colors hover:bg-border"
+                aria-label="Add responsibility"
+              >
+                <Plus className="h-4 w-4 text-text-secondary" />
+              </button>
+            </div>
           </div>
         </div>
-      )}
+
+        <div className="flex justify-end gap-2 border-t border-border px-6 py-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 font-body text-sm text-text-secondary"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!name.trim() || !role.trim()}
+            className="rounded-lg bg-accent px-4 py-2 font-body text-sm font-semibold text-white transition-colors hover:bg-accent-hover disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isNew ? "Add Member" : "Save Changes"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function RaciCell({ code }: { code: string }) {
-  if (!code) return <span className="text-text-muted">—</span>;
+export function TeamRoster() {
+  const { state, dispatch } = useLaunchpad();
+  const members = state.grpi.roles ?? [];
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState<TeamMember | undefined>();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const styles: Record<string, string> = {
-    R: "bg-accent text-white",
-    A: "bg-text-primary text-surface",
-    C: "bg-warning/30 text-text-primary",
-    I: "bg-surface-alt text-text-muted border border-border",
+  const handleSave = (m: TeamMember) => {
+    if (editingMember) {
+      dispatch({ type: "EDIT_MEMBER", memberId: m.id, updates: m });
+    } else {
+      dispatch({ type: "ADD_MEMBER", member: m });
+    }
+    setModalOpen(false);
+    setEditingMember(undefined);
+  };
+
+  const handleDelete = (id: string) => {
+    dispatch({ type: "DELETE_MEMBER", memberId: id });
+    setDeletingId(null);
+  };
+
+  const openAdd = () => {
+    setEditingMember(undefined);
+    setModalOpen(true);
+  };
+
+  const openEdit = (member: TeamMember) => {
+    setEditingMember(member);
+    setModalOpen(true);
   };
 
   return (
-    <span
-      className={cn(
-        "inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-mono font-bold",
-        styles[code] ?? "bg-surface-alt text-text-muted",
+    <div className="max-w-4xl mx-auto">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="font-display text-xl text-text-primary">Team Members</h2>
+          <p className="font-body text-sm text-text-muted mt-0.5">
+            {members.length} member{members.length !== 1 ? "s" : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={openAdd}
+          className="flex items-center gap-2 px-3 py-2 bg-accent text-white rounded-lg font-body text-sm font-semibold hover:bg-accent-hover transition-colors min-h-[44px] shrink-0"
+        >
+          <Plus className="w-4 h-4" />
+          Add Member
+        </button>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {members.map((member) => (
+          <article
+            key={member.id}
+            className="group rounded-2xl border border-border bg-surface p-5 transition-all hover:border-accent/30 hover:shadow-card-hover"
+          >
+            <div className="mb-4 flex items-start justify-between">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-text-primary font-mono text-sm font-bold text-background">
+                  {getInitials(member.name)}
+                </div>
+                <div className="min-w-0">
+                  <p className="font-display text-base text-text-primary leading-tight truncate">
+                    {member.name}
+                  </p>
+                  <p className="font-body text-sm font-medium text-accent">{member.role}</p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity shrink-0">
+                <button
+                  type="button"
+                  onClick={() => openEdit(member)}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:bg-surface-alt hover:text-text-primary transition-colors"
+                  aria-label={`Edit ${member.name}`}
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletingId(member.id)}
+                  className="flex h-11 w-11 items-center justify-center rounded-lg text-text-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+                  aria-label={`Remove ${member.name}`}
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {member.scrumRole && (
+              <span
+                className={cn(
+                  "mb-3 inline-block rounded-full px-2.5 py-1 font-body text-xs font-medium",
+                  SCRUM_COLORS[member.scrumRole],
+                )}
+              >
+                {SCRUM_LABELS[member.scrumRole]}
+              </span>
+            )}
+
+            {member.responsibilities.length > 0 && (
+              <div className="space-y-1">
+                {member.responsibilities.map((r, i) => (
+                  <div key={`${r}-${i}`} className="flex items-start gap-2">
+                    <span className="mt-0.5 shrink-0 text-xs text-accent">→</span>
+                    <span className="font-body text-xs text-text-secondary leading-relaxed">
+                      {r}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {deletingId === member.id && (
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border pt-4">
+                <span className="font-body text-sm font-medium text-red-600">
+                  Remove {member.name.split(" ")[0]}?
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(member.id)}
+                    className="rounded-lg bg-red-600 px-3 py-1 font-body text-xs font-semibold text-white hover:bg-red-700 min-h-[44px]"
+                  >
+                    Remove
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeletingId(null)}
+                    className="px-3 py-1 font-body text-xs text-text-muted min-h-[44px]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+          </article>
+        ))}
+
+        {members.length === 0 && (
+          <div className="col-span-full rounded-2xl border-2 border-dashed border-border py-16 text-center">
+            <p className="font-body text-sm text-text-muted">No team members yet</p>
+            <button
+              type="button"
+              onClick={openAdd}
+              className="mt-3 font-body text-sm text-accent hover:underline min-h-[44px]"
+            >
+              Add your first team member →
+            </button>
+          </div>
+        )}
+      </div>
+
+      {modalOpen && (
+        <MemberModal
+          member={editingMember}
+          onSave={handleSave}
+          onClose={() => {
+            setModalOpen(false);
+            setEditingMember(undefined);
+          }}
+        />
       )}
-    >
-      {code}
-    </span>
+    </div>
   );
 }

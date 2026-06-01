@@ -150,15 +150,9 @@ export default function WorkspacePageClient() {
             onUpdate={handleUpdateWorkspace}
           />
         )}
-        {activeTab === "charter" && (
-          <TeamCharter grpi={grpi} generatedAt={workspace.generatedAt} />
-        )}
-        {activeTab === "meetings" && (
-          <MeetingCadence grpi={grpi} workspace={workspace} />
-        )}
-        {activeTab === "roster" && (
-          <TeamRoster grpi={grpi} workspace={workspace} />
-        )}
+        {activeTab === "charter" && <TeamCharter />}
+        {activeTab === "meetings" && <MeetingCadence />}
+        {activeTab === "roster" && <TeamRoster />}
       </div>
     </div>
   );

@@ -1,0 +1,52 @@
+import type { TeamMeeting } from "./types";
+
+export const DEFAULT_MEETINGS: TeamMeeting[] = [
+  {
+    id: "meeting-1",
+    title: "Sprint Planning",
+    day: "Sun",
+    time: "18:00",
+    duration: 30,
+    type: "planning",
+    isAsync: false,
+    agenda: ["Review backlog", "Set sprint goal", "Assign tasks", "Confirm owners"],
+    recurring: true,
+  },
+  {
+    id: "meeting-2",
+    title: "Daily Standup",
+    day: "Mon",
+    time: "10:00",
+    duration: 15,
+    type: "standup",
+    isAsync: true,
+    agenda: [
+      "What did I complete yesterday?",
+      "What am I doing today?",
+      "Any blockers?",
+    ],
+    recurring: true,
+  },
+  {
+    id: "meeting-3",
+    title: "Sprint Review",
+    day: "Sat",
+    time: "11:00",
+    duration: 20,
+    type: "review",
+    isAsync: false,
+    agenda: ["Demo completed work", "Gather feedback", "Update backlog"],
+    recurring: true,
+  },
+  {
+    id: "meeting-4",
+    title: "Retrospective",
+    day: "Sat",
+    time: "11:30",
+    duration: 15,
+    type: "retrospective",
+    isAsync: false,
+    agenda: ["What worked?", "What didn't?", "What do we change?"],
+    recurring: true,
+  },
+];

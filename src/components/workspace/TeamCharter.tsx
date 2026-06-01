@@ -1,52 +1,288 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { Copy, Download } from "lucide-react";
-import { Button } from "@/components/ui/Button";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Check, Copy, Download, Pencil, Plus, Trash2 } from "lucide-react";
+import { useLaunchpad } from "@/lib/store";
+import { buildCharterPlainText } from "@/lib/charter-utils";
 import { copyToClipboard } from "@/lib/clipboard";
-import { TEMPLATE_LABELS } from "@/lib/onboarding-constants";
-import type { GRPIData } from "@/lib/types";
+import { finalizeGRPI } from "@/lib/grpi-generator";
+import type { TeamCharterData } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export interface TeamCharterProps {
-  grpi: GRPIData;
-  generatedAt: string;
+function Section({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="mb-8">
+      <h3 className="font-display text-lg text-text-primary mb-3 pb-2 border-b border-border">
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
 }
 
-function getConflictLabel(value: string): string {
-  const map: Record<string, string> = {
-    "group-immediately": "Raise it in the group immediately",
-    "direct-first": "Speak directly to the person first",
-    "team-lead": "Bring it to the Team Lead",
-    retrospective: "Wait for the weekly retrospective",
+function EditableText({
+  value,
+  section,
+  placeholder,
+  multiline = false,
+  className = "",
+  onSave,
+}: {
+  value: string;
+  section: keyof TeamCharterData;
+  placeholder: string;
+  multiline?: boolean;
+  className?: string;
+  onSave: (section: keyof TeamCharterData, value: string | string[]) => void;
+}) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState(value);
+  const inputRef = useRef<HTMLTextAreaElement | HTMLInputElement>(null);
+
+  useEffect(() => {
+    setDraft(value);
+  }, [value]);
+
+  useEffect(() => {
+    if (isEditing) inputRef.current?.focus();
+  }, [isEditing]);
+
+  const save = () => {
+    setIsEditing(false);
+    if (draft.trim() !== value) {
+      onSave(section, draft.trim());
+    }
   };
-  return map[value] ?? value;
-}
 
-function getDecisionLabel(value: string): string {
-  const map: Record<string, string> = {
-    consensus: "Consensus — we discuss until everyone agrees",
-    "team-lead": "Team Lead decides — after hearing all views",
-    majority: "Majority vote — 3 out of 5 is enough",
-    delegated: "Delegated — whoever owns the task decides",
+  const cancel = () => {
+    setDraft(value);
+    setIsEditing(false);
   };
-  return map[value] ?? value;
+
+  const inputClass = cn(
+    "w-full px-3 py-2 bg-background border border-accent rounded-lg font-body text-sm text-text-primary focus:outline-none",
+    className,
+  );
+
+  if (isEditing) {
+    return multiline ? (
+      <textarea
+        ref={inputRef as React.RefObject<HTMLTextAreaElement>}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") cancel();
+        }}
+        rows={4}
+        className={cn(inputClass, "resize-none")}
+      />
+    ) : (
+      <input
+        ref={inputRef as React.RefObject<HTMLInputElement>}
+        type="text"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") cancel();
+        }}
+        className={inputClass}
+      />
+    );
+  }
+
+  return (
+    <div
+      role="button"
+      tabIndex={0}
+      onClick={() => setIsEditing(true)}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          setIsEditing(true);
+        }
+      }}
+      className={cn("group cursor-text flex items-start gap-2", className)}
+    >
+      <span
+        className={cn(
+          "flex-1 font-body text-sm text-text-primary leading-relaxed",
+          !value && "text-text-muted italic",
+        )}
+      >
+        {value || placeholder}
+      </span>
+      <Pencil className="w-3.5 h-3.5 text-border group-hover:text-accent transition-colors mt-0.5 shrink-0" />
+    </div>
+  );
 }
 
-function getFeedbackLabel(value: string): string {
-  const map: Record<string, string> = {
-    direct: "Direct & verbal (in meetings)",
-    structured: "Structured (written, with template)",
-    "async-written": "Async written (comments in docs)",
-    retrospectives: "Sprint retrospectives only",
+function EditableList({
+  items,
+  section,
+  placeholder,
+  addLabel,
+  onSave,
+}: {
+  items: string[];
+  section: keyof TeamCharterData;
+  placeholder: string;
+  addLabel: string;
+  onSave: (section: keyof TeamCharterData, value: string | string[]) => void;
+}) {
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
+  const [isAdding, setIsAdding] = useState(false);
+  const [newItem, setNewItem] = useState("");
+
+  const saveEdit = (index: number) => {
+    const updated = [...items];
+    updated[index] = draft.trim();
+    onSave(section, updated.filter(Boolean));
+    setEditingIndex(null);
   };
-  return map[value] ?? value;
+
+  const deleteItem = (index: number) => {
+    onSave(
+      section,
+      items.filter((_, i) => i !== index),
+    );
+  };
+
+  const addItem = () => {
+    if (!newItem.trim()) return;
+    onSave(section, [...items, newItem.trim()]);
+    setNewItem("");
+    setIsAdding(false);
+  };
+
+  return (
+    <div className="space-y-2">
+      {items.map((item, i) => (
+        <div key={`${item}-${i}`} className="flex items-center gap-2 group">
+          <span className="text-accent font-mono text-xs mt-0.5 shrink-0">→</span>
+          {editingIndex === i ? (
+            <input
+              autoFocus
+              type="text"
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onBlur={() => saveEdit(i)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") saveEdit(i);
+                if (e.key === "Escape") setEditingIndex(null);
+              }}
+              className="flex-1 px-2 py-1 bg-background border border-accent rounded-lg font-body text-sm text-text-primary focus:outline-none"
+            />
+          ) : (
+            <>
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setEditingIndex(i);
+                  setDraft(item);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    setEditingIndex(i);
+                    setDraft(item);
+                  }
+                }}
+                className="flex-1 font-body text-sm text-text-primary cursor-text hover:text-accent transition-colors"
+              >
+                {item}
+              </span>
+              <button
+                type="button"
+                onClick={() => deleteItem(i)}
+                className="opacity-0 group-hover:opacity-100 text-text-muted hover:text-red-500 transition-all min-h-[44px] min-w-[44px] flex items-center justify-center"
+                aria-label={`Delete ${item}`}
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </>
+          )}
+        </div>
+      ))}
+
+      {isAdding ? (
+        <div className="flex items-center gap-2">
+          <span className="text-accent font-mono text-xs shrink-0">→</span>
+          <input
+            autoFocus
+            type="text"
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addItem();
+              if (e.key === "Escape") {
+                setIsAdding(false);
+                setNewItem("");
+              }
+            }}
+            placeholder={placeholder}
+            className="flex-1 px-2 py-1 bg-background border border-accent rounded-lg font-body text-sm text-text-primary focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={addItem}
+            className="text-accent min-h-[44px] min-w-[44px] flex items-center justify-center"
+            aria-label="Confirm"
+          >
+            <Check className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setIsAdding(false);
+              setNewItem("");
+            }}
+            className="text-text-muted min-h-[44px] px-2"
+          >
+            ✕
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsAdding(true)}
+          className="flex items-center gap-1.5 font-body text-xs text-text-muted hover:text-accent transition-colors mt-1 min-h-[44px]"
+        >
+          <Plus className="w-3.5 h-3.5" />
+          {addLabel}
+        </button>
+      )}
+    </div>
+  );
 }
 
-export function TeamCharter({ grpi, generatedAt }: TeamCharterProps) {
-  const printRef = useRef<HTMLDivElement>(null);
+export function TeamCharter() {
+  const { state, dispatch } = useLaunchpad();
+  const grpi = finalizeGRPI(state.grpi);
   const [copied, setCopied] = useState(false);
-  const { goals, roles, processes, norms } = grpi;
+
+  if (!grpi || !state.workspace) {
+    return null;
+  }
+
+  const charter = state.workspace.charter ?? {};
+  const generatedAt = state.workspace.generatedAt;
+
+  const saveSection = (section: keyof TeamCharterData, value: string | string[]) => {
+    dispatch({ type: "UPDATE_CHARTER_SECTION", section, value });
+  };
+
+  const handleCopy = async () => {
+    const text = buildCharterPlainText(grpi, charter);
+    const ok = await copyToClipboard(text);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   const formattedDate = new Date(generatedAt).toLocaleDateString("en-GB", {
     day: "numeric",
@@ -54,236 +290,167 @@ export function TeamCharter({ grpi, generatedAt }: TeamCharterProps) {
     year: "numeric",
   });
 
-  const buildPlainText = () => {
-    const lines = [
-      `TEAM CHARTER — ${goals.projectName}`,
-      `${TEMPLATE_LABELS[goals.projectTemplate]} · Generated ${formattedDate}`,
-      "",
-      "OUR PURPOSE",
-      goals.primaryGoal,
-      "",
-      "SUCCESS CRITERIA",
-      ...goals.successCriteria.map((c) => `• ${c}`),
-      "",
-      "CONSTRAINTS",
-      ...goals.constraints.map((c) => `• ${c}`),
-      "",
-      "TEAM MEMBERS",
-      ...roles.map(
-        (m) =>
-          `${m.name} — ${m.role}\n${m.responsibilities.map((r) => `  • ${r}`).join("\n")}`,
-      ),
-      "",
-      "WAYS OF WORKING",
-      `Communication: ${processes.communicationChannel}`,
-      `Meetings: ${processes.meetingCadence}`,
-      `Decisions: ${getDecisionLabel(processes.decisionMaking)}`,
-      `Files: ${processes.fileStorage}`,
-      `Feedback: ${getFeedbackLabel(processes.feedbackStyle)}`,
-      "",
-      "TEAM NORMS",
-      `Response time: ${norms.responseTime}`,
-      norms.workingHours,
-      getConflictLabel(norms.conflictResolution),
-      ...norms.customNorms.map((n) => `• ${n}`),
-      "",
-      "AI USE POLICY",
-      processes.aiPolicy,
-    ];
-    return lines.join("\n");
-  };
-
-  const handleCopy = async () => {
-    const ok = await copyToClipboard(buildPlainText());
-    if (ok) {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
   return (
-    <div className="space-y-4">
-      <div data-print-hide className="flex flex-wrap gap-3">
-        <Button variant="secondary" size="md" onClick={handleCopy} icon={<Copy size={16} />}>
-          {copied ? "Copied!" : "Copy as Text"}
-        </Button>
-        <Button variant="secondary" size="md" onClick={handlePrint} icon={<Download size={16} />}>
-          Download as PDF
-        </Button>
+    <div className="max-w-3xl mx-auto" id="team-charter-tab">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <p className="font-body text-sm text-text-muted">
+          Click any field to edit it directly
+        </p>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-2 px-3 py-2 bg-surface border border-border rounded-lg font-body text-sm text-text-secondary hover:border-text-primary transition-colors min-h-[44px]"
+          >
+            <Copy className="w-4 h-4" />
+            {copied ? "Copied!" : "Copy as text"}
+          </button>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="flex items-center gap-2 px-3 py-2 bg-text-primary text-background rounded-lg font-body text-sm font-medium hover:opacity-90 transition-colors min-h-[44px]"
+          >
+            <Download className="w-4 h-4" />
+            Export PDF
+          </button>
+        </div>
       </div>
 
       <div
-        ref={printRef}
-        id="team-charter-document"
-        data-print-header={`${goals.projectName} · Generated ${formattedDate}`}
-        className={cn(
-          "relative overflow-hidden rounded-card border border-border",
-          "bg-[#FFFDF9] px-8 py-10 md:px-14 md:py-14 shadow-card print:shadow-none print:border-none",
-        )}
+        className="bg-surface rounded-2xl border border-border p-6 sm:p-8 print:shadow-none print:border-0"
+        data-print-charter
       >
-        <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
-          aria-hidden="true"
-        >
-          <span
-            className="font-display text-[5rem] md:text-[7rem] text-text-primary/[0.03] whitespace-nowrap -rotate-[28deg] select-none"
-          >
-            TEAM TSCHÜSS
-          </span>
+        <div className="text-center mb-8 pb-6 border-b border-border">
+          <p className="font-mono text-xs text-text-muted uppercase tracking-widest mb-2">
+            Team Charter
+          </p>
+          <h1 className="font-display text-3xl text-text-primary">
+            {grpi.goals.projectName}
+          </h1>
+          <p className="font-body text-sm text-text-secondary mt-2">
+            {grpi.roles.map((r) => r.name).join(" · ")}
+          </p>
+          <p className="font-mono text-xs text-text-muted mt-2">
+            Generated {formattedDate}
+          </p>
         </div>
 
-        <div className="relative z-10 max-w-3xl mx-auto space-y-10 text-text-primary">
-          <header className="border-b border-border pb-8">
-            <p className="font-mono text-xs uppercase tracking-[0.2em] text-accent mb-3">
-              Team Charter
-            </p>
-            <h1 className="font-display text-4xl mb-2">{goals.projectName}</h1>
-            <p className="text-text-secondary font-body">
-              {TEMPLATE_LABELS[goals.projectTemplate]} · Generated {formattedDate} ·
-              Deadline {goals.deadline}
-            </p>
-          </header>
+        <Section title="Our Purpose">
+          <EditableText
+            value={charter.purpose ?? grpi.goals.primaryGoal ?? ""}
+            section="purpose"
+            placeholder="Click to add your team's purpose..."
+            multiline
+            onSave={saveSection}
+          />
+        </Section>
 
-          <section>
-            <h2 className="font-display text-2xl mb-4 pb-2 border-b border-border/60">
-              1. Our Purpose
-            </h2>
-            <p className="font-body text-text-secondary leading-relaxed text-lg mb-6">
-              {goals.primaryGoal}
-            </p>
-            <h3 className="font-body font-semibold text-text-primary mb-2">
-              Success Criteria
-            </h3>
-            <ol className="list-decimal list-inside space-y-1 font-body text-text-secondary mb-6">
-              {goals.successCriteria.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ol>
-            <h3 className="font-body font-semibold text-text-primary mb-2">
-              Constraints
-            </h3>
-            <ol className="list-decimal list-inside space-y-1 font-body text-text-secondary">
-              {goals.constraints.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ol>
-          </section>
+        <Section title="Success Criteria">
+          <EditableList
+            items={charter.successCriteria ?? grpi.goals.successCriteria ?? []}
+            section="successCriteria"
+            placeholder="Add a success criterion..."
+            addLabel="Add criterion"
+            onSave={saveSection}
+          />
+        </Section>
 
-          <section>
-            <h2 className="font-display text-2xl mb-6 pb-2 border-b border-border/60">
-              2. Team Members & Roles
-            </h2>
-            <div className="grid gap-4 sm:grid-cols-2">
-              {roles.map((member) => (
-                <div
-                  key={member.id}
-                  className="rounded-card border border-border bg-surface/60 p-4"
-                >
-                  <h3 className="font-display text-xl text-text-primary">
-                    {member.name}
-                  </h3>
-                  <p className="text-accent font-body font-medium text-sm mt-0.5">
-                    {member.role}
-                  </p>
-                  <p className="font-mono text-[10px] text-text-muted uppercase mt-1 mb-3">
-                    {member.scrumRole === "product-owner"
-                      ? "Product Owner"
-                      : member.scrumRole === "scrum-master"
-                        ? "Scrum Master"
-                        : "Dev Team"}
-                  </p>
-                  <ul className="text-sm text-text-secondary font-body space-y-1 list-disc list-inside">
-                    {member.responsibilities.map((r) => (
-                      <li key={r}>{r}</li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
+        <Section title="Constraints">
+          <EditableList
+            items={charter.constraints ?? grpi.goals.constraints ?? []}
+            section="constraints"
+            placeholder="Add a constraint..."
+            addLabel="Add constraint"
+            onSave={saveSection}
+          />
+        </Section>
+
+        <Section title="Ways of Working">
+          <div className="space-y-4">
+            <div>
+              <p className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">
+                Communication
+              </p>
+              <EditableText
+                value={
+                  charter.communicationNorms ??
+                  `Primary channel: ${grpi.processes.communicationChannel}. Response within ${grpi.norms.responseTime}.`
+                }
+                section="communicationNorms"
+                placeholder="Describe your communication norms..."
+                multiline
+                onSave={saveSection}
+              />
             </div>
-          </section>
-
-          <section>
-            <h2 className="font-display text-2xl mb-4 pb-2 border-b border-border/60">
-              3. Ways of Working
-            </h2>
-            <p className="font-body text-text-secondary leading-relaxed mb-6">
-              We communicate via <strong>{processes.communicationChannel}</strong>.
-              Our meeting cadence is <strong>{processes.meetingCadence.replace("-", " ")}</strong>.
-              Decisions: <strong>{getDecisionLabel(processes.decisionMaking)}</strong>.
-              Files live in <strong>{processes.fileStorage}</strong>. Feedback through{" "}
-              <strong>{getFeedbackLabel(processes.feedbackStyle)}</strong>.
-            </p>
-            <div className="overflow-x-auto rounded-card border border-border">
-              <table className="w-full text-sm font-body">
-                <thead>
-                  <tr className="bg-surface-alt">
-                    <th className="text-left px-4 py-2 font-medium">Area</th>
-                    <th className="text-left px-4 py-2 font-medium">Agreement</th>
-                  </tr>
-                </thead>
-                <tbody className="text-text-secondary">
-                  {[
-                    ["Communication", processes.communicationChannel],
-                    ["Meetings", processes.meetingCadence],
-                    ["Decisions", getDecisionLabel(processes.decisionMaking)],
-                    ["File storage", processes.fileStorage],
-                    ["Feedback", getFeedbackLabel(processes.feedbackStyle)],
-                  ].map(([area, val]) => (
-                    <tr key={area} className="border-t border-border">
-                      <td className="px-4 py-2 font-medium text-text-primary">{area}</td>
-                      <td className="px-4 py-2">{val}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div>
+              <p className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">
+                Meetings
+              </p>
+              <EditableText
+                value={
+                  charter.meetingNorms ??
+                  `We meet ${grpi.processes.meetingCadence}. Meetings are called only when necessary and kept short.`
+                }
+                section="meetingNorms"
+                placeholder="Describe your meeting norms..."
+                multiline
+                onSave={saveSection}
+              />
             </div>
-          </section>
+            <div>
+              <p className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">
+                Feedback
+              </p>
+              <EditableText
+                value={
+                  charter.feedbackNorms ??
+                  `Feedback style: ${grpi.processes.feedbackStyle}. We give feedback as we go.`
+                }
+                section="feedbackNorms"
+                placeholder="Describe your feedback approach..."
+                multiline
+                onSave={saveSection}
+              />
+            </div>
+            <div>
+              <p className="font-body text-xs font-semibold text-text-muted uppercase tracking-wider mb-1">
+                Conflict Resolution
+              </p>
+              <EditableText
+                value={charter.conflictResolution ?? grpi.norms.conflictResolution ?? ""}
+                section="conflictResolution"
+                placeholder="Describe how you handle conflict..."
+                multiline
+                onSave={saveSection}
+              />
+            </div>
+          </div>
+        </Section>
 
-          <section>
-            <h2 className="font-display text-2xl mb-4 pb-2 border-b border-border/60">
-              4. Team Norms
-            </h2>
-            <ol className="space-y-3 font-body text-text-secondary list-decimal list-inside">
-              <li>
-                <strong className="text-text-primary">Response time:</strong>{" "}
-                {norms.responseTime}
-              </li>
-              <li>
-                <strong className="text-text-primary">Working hours:</strong>{" "}
-                {norms.workingHours}
-              </li>
-              <li>
-                <strong className="text-text-primary">Conflict resolution:</strong>{" "}
-                {getConflictLabel(norms.conflictResolution)}
-              </li>
-              <li>
-                <strong className="text-text-primary">Commitment:</strong>{" "}
-                {norms.commitmentLevel}
-              </li>
-              {norms.customNorms.map((n) => (
-                <li key={n}>{n}</li>
-              ))}
-            </ol>
-          </section>
+        <Section title="Team Norms">
+          <EditableList
+            items={charter.customNorms ?? grpi.norms.customNorms ?? []}
+            section="customNorms"
+            placeholder="Add a team norm..."
+            addLabel="Add norm"
+            onSave={saveSection}
+          />
+        </Section>
 
-          <section>
-            <h2 className="font-display text-2xl mb-4 pb-2 border-b border-border/60">
-              5. AI Use Policy
-            </h2>
-            <p className="font-body text-text-secondary leading-relaxed whitespace-pre-wrap">
-              {processes.aiPolicy}
-            </p>
-          </section>
+        <Section title="AI Use Policy">
+          <EditableText
+            value={charter.aiPolicy ?? grpi.processes.aiPolicy ?? ""}
+            section="aiPolicy"
+            placeholder="Describe your team's AI use policy..."
+            multiline
+            onSave={saveSection}
+          />
+        </Section>
 
-          <footer className="pt-8 border-t border-border text-center">
-            <p className="text-xs font-mono text-text-muted">
-              Generated by The Digital Collaboration Launchpad · {formattedDate}
-            </p>
-          </footer>
+        <div className="mt-8 pt-4 border-t border-border text-center">
+          <p className="font-mono text-xs text-text-muted">
+            Digital Collaboration Launchpad · Team Tschüss · ESCP Berlin
+          </p>
         </div>
       </div>
     </div>

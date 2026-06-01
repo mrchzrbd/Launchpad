@@ -96,11 +96,47 @@ export interface RaciRow {
   assignments: Record<string, "R" | "A" | "C" | "I" | "">;
 }
 
+export interface TeamCharterData {
+  purpose?: string;
+  vision?: string;
+  successCriteria?: string[];
+  constraints?: string[];
+  communicationNorms?: string;
+  meetingNorms?: string;
+  feedbackNorms?: string;
+  conflictResolution?: string;
+  aiPolicy?: string;
+  customNorms?: string[];
+}
+
+export type TeamMeetingDay = "Mon" | "Tue" | "Wed" | "Thu" | "Fri" | "Sat" | "Sun";
+
+export type TeamMeetingType =
+  | "standup"
+  | "planning"
+  | "review"
+  | "retrospective"
+  | "custom";
+
+export interface TeamMeeting {
+  id: string;
+  title: string;
+  day: TeamMeetingDay;
+  time: string;
+  duration: number;
+  type: TeamMeetingType;
+  isAsync: boolean;
+  agenda: string[];
+  recurring: boolean;
+}
+
 export interface WorkspaceData {
   teamCharter: string;
+  charter?: TeamCharterData;
   kanbanColumns: KanbanColumn[];
   meetingTemplate: string;
   meetingSchedule: MeetingBlock[];
+  meetings?: TeamMeeting[];
   raciMatrix: RaciRow[];
   epics: string[];
   generatedAt: string;

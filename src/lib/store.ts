@@ -16,8 +16,11 @@ import { DEMO_DATA, DEMO_MODE_SESSION_KEY } from "./demo-data";
 import { finalizeGRPI } from "./grpi-generator";
 import type {
   GRPIData,
+  KanbanTask,
   LaunchpadState,
+  TeamCharterData,
   TeamGoals,
+  TeamMeeting,
   TeamMember,
   TeamNorms,
   TeamProcesses,
@@ -48,6 +51,37 @@ export type LaunchpadAction =
   | { type: "SET_COMPLETE" }
   | { type: "FINISH_ONBOARDING" }
   | { type: "UPDATE_KANBAN"; payload: WorkspaceData["kanbanColumns"] }
+  | {
+      type: "EDIT_TASK";
+      columnId: string;
+      taskId: string;
+      updates: Partial<
+        Pick<
+          KanbanTask,
+          "title" | "description" | "priority" | "epic" | "assignee" | "dueDate"
+        >
+      >;
+    }
+  | { type: "DELETE_TASK"; columnId: string; taskId: string }
+  | {
+      type: "UPDATE_CHARTER_SECTION";
+      section: keyof TeamCharterData;
+      value: string | string[];
+    }
+  | { type: "ADD_MEETING"; meeting: TeamMeeting }
+  | {
+      type: "EDIT_MEETING";
+      meetingId: string;
+      updates: Partial<TeamMeeting>;
+    }
+  | { type: "DELETE_MEETING"; meetingId: string }
+  | { type: "ADD_MEMBER"; member: TeamMember }
+  | {
+      type: "EDIT_MEMBER";
+      memberId: string;
+      updates: Partial<TeamMember>;
+    }
+  | { type: "DELETE_MEMBER"; memberId: string }
   | { type: "ACTIVATE_DEMO" }
   | { type: "RESET" };
 
@@ -120,6 +154,124 @@ function reducer(state: LaunchpadState, action: LaunchpadAction): LaunchpadState
             workspace: { ...state.workspace, kanbanColumns: action.payload },
           }
         : state;
+
+    case "EDIT_TASK": {
+      if (!state.workspace) return state;
+      const { columnId, taskId, updates } = action;
+      const newColumns = state.workspace.kanbanColumns.map((col) => {
+        if (col.id !== columnId) return col;
+        return {
+          ...col,
+          tasks: col.tasks.map((t) =>
+            t.id === taskId ? { ...t, ...updates } : t,
+          ),
+        };
+      });
+      return {
+        ...state,
+        workspace: { ...state.workspace, kanbanColumns: newColumns },
+      };
+    }
+
+    case "DELETE_TASK": {
+      if (!state.workspace) return state;
+      const { columnId, taskId } = action;
+      const newColumns = state.workspace.kanbanColumns.map((col) => {
+        if (col.id !== columnId) return col;
+        return {
+          ...col,
+          tasks: col.tasks.filter((t) => t.id !== taskId),
+        };
+      });
+      return {
+        ...state,
+        workspace: { ...state.workspace, kanbanColumns: newColumns },
+      };
+    }
+
+    case "UPDATE_CHARTER_SECTION": {
+      if (!state.workspace) return state;
+      const { section, value } = action;
+      return {
+        ...state,
+        workspace: {
+          ...state.workspace,
+          charter: {
+            ...(state.workspace.charter ?? {}),
+            [section]: value,
+          },
+        },
+      };
+    }
+
+    case "ADD_MEETING": {
+      if (!state.workspace) return state;
+      return {
+        ...state,
+        workspace: {
+          ...state.workspace,
+          meetings: [...(state.workspace.meetings ?? []), action.meeting],
+        },
+      };
+    }
+
+    case "EDIT_MEETING": {
+      if (!state.workspace) return state;
+      const { meetingId, updates } = action;
+      return {
+        ...state,
+        workspace: {
+          ...state.workspace,
+          meetings: (state.workspace.meetings ?? []).map((m) =>
+            m.id === meetingId ? { ...m, ...updates } : m,
+          ),
+        },
+      };
+    }
+
+    case "DELETE_MEETING": {
+      if (!state.workspace) return state;
+      return {
+        ...state,
+        workspace: {
+          ...state.workspace,
+          meetings: (state.workspace.meetings ?? []).filter(
+            (m) => m.id !== action.meetingId,
+          ),
+        },
+      };
+    }
+
+    case "ADD_MEMBER":
+      return {
+        ...state,
+        grpi: {
+          ...state.grpi,
+          roles: [...(state.grpi.roles ?? []), action.member],
+        },
+      };
+
+    case "EDIT_MEMBER": {
+      const { memberId, updates } = action;
+      return {
+        ...state,
+        grpi: {
+          ...state.grpi,
+          roles: (state.grpi.roles ?? []).map((r) =>
+            r.id === memberId ? { ...r, ...updates } : r,
+          ),
+        },
+      };
+    }
+
+    case "DELETE_MEMBER":
+      return {
+        ...state,
+        grpi: {
+          ...state.grpi,
+          roles: (state.grpi.roles ?? []).filter((r) => r.id !== action.memberId),
+        },
+      };
 
     case "ACTIVATE_DEMO": {
       const grpi: GRPIData = {
